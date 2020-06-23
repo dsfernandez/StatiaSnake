@@ -11,24 +11,27 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Metadata [to complete]
+
+__Season__: each year  
+
+__Visits__: frequency; details on observational design
+
+
 ## Loading data
 Data from Hanna.  
 _Note: occupancy = occurrence_. 
 
-> Questions: Each year is a season, with many surveys?  Or, each survey is a season, or each month is a season, with several surveys?  
-> 2018 and 2019 with the same number of surveys?  
-
 
 ```{r}
 library(readxl)
-Also2018 <- read_excel("Alsophis 2018 occupancy data.xlsx")
+Also2018 <- read_excel("Alsophis 2018 occupancy data_covariates.xlsx")
 head(Also2018)
-Also2019 <- read_excel("Alsophis 2019 occupancy data.xlsx")
+Also2019 <- read_excel("Alsophis 2019 occupancy data_covariates.xlsx")
 head(Also2019)
 ```
 
 ## Cleaning the names of the columns  
-Note: _Why to "clean" variable names? The space?_  
 
 ```{r}
 # install.packages("janitor")
@@ -40,86 +43,95 @@ head(Also2019)
 ```
 
 ## Using occSS
+
 __occSS__: allows for psi or p to be modelled as a logistic function of site covariates or survey covariates, as specified by model. It includes a built in .time covariate which can be used for modelling p with time as a fixed effect, and .Time for a linear or quadratic trend. A built-in .b covariate corresponds to a behavioural effect, where detection depends on whether the species was detected on the previous occasion or not.  
 
 _link_: function to link the response on a (0,1) scale to a linear predictor on (-Inf, Inf). The canonical link is the logistic ("logit") function, which has some nice theoretical properties and can be interpreted as the log of the odds of success. Other links are available, notably the cumulative standard normal ("probit") link, which allows for Gibbs sampling with truncated normal distributions. For that reason, several of the Bayesian estimation functions in wiqid use the probit link.  
 
-Note: _Why Also24?_
-
 ```{r}
 library(wiqid)
+#extraction of occupancy matrix DH
+Also2018DH <- Also2018[,1:24]
+Also2019DH <- Also2019[,1:22]
 #with link 
 #2018 logit
-occSS(Also2018, link=c("logit"))
+occSS(Also2018DH, link=c("logit"))
 #2019 logit
-occSS(Also2019[,1:17], link=c("logit"))
+occSS(Also2019DH, link=c("logit"))
 #2018 probit
-occSS(Also2018, link=c("probit"))
+occSS(Also2018DH, link=c("probit"))
 #2019 probit
-occSS(Also2019[,1:17], link=c("probit"))
+occSS(Also2019DH, link=c("probit"))
 #A built-in .b covariate corresponds to a behavioural effect, where detection depends on whether the species was detected on the previous occasion or not.
 #2018 
-occSS(Also2018, p ~ .b)
+occSS(Also2018DH, p ~ .b)
 #2019
-occSS(Also2019[,1:17], p ~ .b)
+occSS(Also2019DH, p ~ .b)
 ```
 
 _occSS0_:implements a simple model with one parameter for probability of occupancy and one for probability of detection, ie. a psi(.) p(.) model.
 
 ```{r}
 #2018
-# with Also24 1:17
-Also24 <- Also2018[,1:17]
-y <- rowSums(Also24, na.rm=TRUE)
-n <- rowSums(!is.na(Also24))
+# with Also2018DH 24 visits
+y <- rowSums(Also2018DH, na.rm=TRUE)
+n <- rowSums(!is.na(Also2018DH))
 # occSS0 is a faster simple form of occSS
 occSS0(y, n)
-#2019
-y <- rowSums(Also2019[,1:17], na.rm=TRUE)
-n <- rowSums(!is.na(Also2019[,1:17]))
+# with Also2019DH 22 visits 
+y <- rowSums(Also2019DH, na.rm=TRUE)
+n <- rowSums(!is.na(Also2019DH))
 # occSS0 is a faster simple form of occSS
 occSS0(y, n)
 ```
 
-occSS and occSS0 do the same thing for 2019
-but for 2018 depend if we use all data or 1:17
 
-##Other occSSs  
+## Other occSSs  
 
 __occSStime__: allows for time-varying covariates that are the same across all sites, eg, moon-phase. A categorical time variable .time and a time trend .Time are built-in. A plot of detection probability vs time is produced if plot=TRUE. 
 
-Note: _Does not work with Also2018_
 
 ```{r}
 #time effect accross all sites
 #2018
-time <- occSStime(Also24, p ~ .time)
+time <- occSStime(Also2018DH, p ~ .time)
 time[["real"]]
 # trend linear
-Time <- occSStime(Also24, p ~ .Time)
+Time <- occSStime(Also2018DH, p ~ .Time)
 Time[["real"]]
 # trend quadratic
-Time2 <- occSStime(Also24, p ~ .Time + I(.Time^2))
+Time2 <- occSStime(Also2018DH, p ~ .Time + I(.Time^2))
 Time2[["real"]]
 #2019
-time <- occSStime(Also2019[,1:17], p ~ .time)
+time <- occSStime(Also2019DH, p ~ .time)
 time[["real"]]
 # trend linear
-Time <- occSStime(Also2019[,1:17], p ~ .Time)
+Time <- occSStime(Also2019DH, p ~ .Time)
 Time[["real"]]
 # trend quadratic
-Time2 <- occSStime(Also2019[,1:17], p ~ .Time + I(.Time^2))
+Time2 <- occSStime(Also2019DH, p ~ .Time + I(.Time^2))
 Time2[["real"]]
 ```
-
-Apparently it is nor worthwhile to do more than 3 - 5 surveys on a year/season according to 2018, but maybe is good to do 10 surveys according to 2019.
+__Question:__ From above results, can we establish how many visits are enough?
 
 __occSScovSite__: allows for site covariates but not for occasion or survey covariates.
 
 ```{r}
-Also2019_17 <- Also2019[,1:17]
-y <- rowSums(Also2019_17, na.rm=TRUE)
-n <- rowSums(!is.na(Also2019_17))
+#2018
+y <- rowSums(Also2018DH, na.rm=TRUE)
+n <- rowSums(!is.na(Also2018DH))
+# model habitat
+occSScovSite(y, n, model = psi ~ habitat, data = Also2018)
+# model elevation
+occSScovSite(y, n, model = psi ~ elevation, data = Also2018)
+res1 <- occSScovSite(y, n, model = psi ~ elevation, data = Also2018)
+# plot psi vs elevation
+psi <- as.data.frame(res1[["real"]])
+psi <- psi[1:81,1]
+plot(Also2018$elevation,psi)
+#2019
+y <- rowSums(Also2019DH, na.rm=TRUE)
+n <- rowSums(!is.na(Also2019DH))
 # model habitat
 occSScovSite(y, n, model = psi ~ habitat, data = Also2019)
 # model elevation
@@ -127,17 +139,12 @@ occSScovSite(y, n, model = psi ~ elevation, data = Also2019)
 res2 <- occSScovSite(y, n, model = psi ~ elevation, data = Also2019)
 # plot psi vs elevation
 psi <- as.data.frame(res2[["real"]])
-psi <- psi[1:107,1]
+psi <- psi[1:108,1]
 plot(Also2019$elevation,psi)
 ```
 
-Apparently low elevation sites tend to have more probability of being occupied.
 
-Need file for 2018, or is the same structure? (same sequence of sites)
-
-Note: _Do we have multi season-month or multi years?_
-
-##Royle-Nichols functions  
+## Royle-Nichols functions  
 
 These functions implement the Royle-Nichols method (Royle & Nichols 2003) for estimation of site occupancy allowing for abundance-induced heterogeneity in detection probability. Probability of detection is modelled as a function of the number of animals available for detection, n, and the probability of detection of an individual animal, r. Probability of occupancy is derived as the probability that n > 0.
 
@@ -145,49 +152,54 @@ Function occSSrn allows for site-specific covariates to be included in the model
 ```{r}
 # 2018
 #basic model
-Also24 <- Also2018[,1:17]
-occSSrn(Also24)
+occSSrn(Also2018DH)
 # 2019
 #basic model
-Also2019_17 <- Also2019[,1:17]
-occSSrn(Also2019_17)
-#lambda (and psi?) - elevation
-Also2019_17 <- Also2019[,1:17]
-occSSrn(Also2019_17, model = lambda ~ elevation, data = Also2019)
-#lambda (and psi?) - habitat
-Also2019_17 <- Also2019[,1:17]
-occSSrn(Also2019_17, model = lambda ~ habitat, data = Also2019)
-#r - elevation
-Also2019_17 <- Also2019[,1:17]
-occSSrn(Also2019_17, model = r ~ elevation, data = Also2019)
+occSSrn(Also2019DH)
+#lambda - elevation
+#2018
+occSSrn(Also2018DH, model = lambda ~ elevation, data = Also2018)
+#2019
+occSSrn(Also2019DH, model = lambda ~ elevation, data = Also2019)
+#lambda ~ habitat
+#2018
+occSSrn(Also2018DH, model = lambda ~ habitat, data = Also2018)
+#2019
+occSSrn(Also2019DH, model = lambda ~ habitat, data = Also2019)
 ```
 
 ##Graphs
 
 ```{r}
-Also2019_17 <- Also2019[,1:17]
-lamelev <- occSSrn(Also2019_17, model = lambda ~ elevation, data = Also2019)
-lamelev <- as.data.frame(lamelev[["real"]])
+#2018
+lamelev18 <- occSSrn(Also2018DH, model = lambda ~ elevation, data = Also2018)
+lamelev18 <- as.data.frame(lamelev18[["real"]])
 #psi vs elevation
-plot(Also2019$elevation,lamelev[1:107,1])
+plot(Also2018$elevation,lamelev18[1:81,1])
 #lambda vs elevation
-plot(Also2019$elevation,lamelev[108:214,1])
+plot(Also2018$elevation,lamelev18[82:162,1])
 ###
-Also2019_17 <- Also2019[,1:17]
-relev <- occSSrn(Also2019_17, model = r ~ elevation, data = Also2019)
-relev <- as.data.frame(relev[["real"]])
-#r vs elevation
-plot(Also2019$elevation,relev[215:321,1])
+#2019
+lamelev19 <- occSSrn(Also2019DH, model = lambda ~ elevation, data = Also2019)
+lamelev19 <- as.data.frame(lamelev19[["real"]])
+#psi vs elevation
+plot(Also2019$elevation,lamelev19[1:108,1])
+#lambda vs elevation
+plot(Also2019$elevation,lamelev19[109:216,1])
 ```
 
-
+## 
 
 
 
 ++++++++++++++++++++++++++++
-EXAMPLE MS
+EXAMPLE MS - 
 ============================
 
+```{r}
+#2018 alone
+occMS(Also2018DH, 24, data=Also2018)
+```
 
 
 ##GrandSkins data set
@@ -195,6 +207,9 @@ EXAMPLE MS
 ```{r}
 data(GrandSkinks)
 head(GrandSkinks)
+
+data(weta)
+head(weta)
 
 #testing
 data(GrandSkinks)
